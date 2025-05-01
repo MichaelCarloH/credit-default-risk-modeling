@@ -4,9 +4,10 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 import llm_research as llm
 import json
+from sector_dashboard import load_sector_data, create_sector_layout
 
 # Load the companies' data
-companies = pd.read_excel("/Users/keithatienza/Desktop/Academics/Statistical Consulting/credit-default-risk-modeling/data/output.xlsx")
+companies = pd.read_excel("data/output.xlsx")
 companies = companies[['Company name Latin alphabet', 'Standardized country']]
 companies = companies[companies['Standardized country'] != 'Russia']
 companies.columns = ['company', 'country']
@@ -14,6 +15,8 @@ companies.columns = ['company', 'country']
 companies['company'] = companies['company'].str.title() # Convert company names and country to proper case
 companies['country'] = companies['country'].str.title()
 
+# Load sector data
+#sector_data = load_sector_data()
 
 # Initialize the Dash app
 app = dash.Dash(__name__)
@@ -50,6 +53,9 @@ def update_output(selected_company):
         ])
         return formatted_output
     return "Generate research report by selecting a company from the dropdown."
+
+# Create the sector layout
+#create_sector_layout(app, sector_data)
 
 # Run the app
 if __name__ == '__main__':
