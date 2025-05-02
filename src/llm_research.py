@@ -10,7 +10,7 @@ def generate_research(company_name, country):
     prompt = f"""You are a research assistant. You are responsible for researching and providing financial information of the following company. 
     You should always output the following sections: \n\n
     1. Company Description: A short description of the company. The description should include the industry, their main products (if any), and any other relevant information that gives core insight about the company. If possible, use the description of the company seen in the company's website. The description should be concise and informative, written in one paragraph, and contain no more than 250 words. \n
-    2. Financial Description: Research the company using publicly-available information that may be relevant to the financial status or credit risk of the company. Write a short paragraph of your findings, and always cite your sources. \n
+    2. Public Financial Description: Research the company using publicly-available information that may be relevant to the financial status or credit risk of the company. Write a short paragraph of your findings, and always cite your sources. \n
     3. Potential Benefits: Provide a paragraph of the potential upsides of investing in the company. This should include any positive news, developments, or trends that may indicate a positive outlook for the company. \n
     4. Potential Risks: Provide a paragraph of the potential downsides of the company of investing in the company. This should include any negative news, developments, or trends that may indicate a negative outlook for the company. \n\n
     
