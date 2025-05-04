@@ -108,7 +108,7 @@ app.layout = html.Div([
             ], style={'width': '100%', 'marginBottom': '10px'}),
             
             # Financial Scorecard Header
-            html.H3('Financial Scorecard', style={
+            html.H3('Topline Metrics (€ in thousands)', style={
                 'textAlign': 'center',
                 'marginTop': '30px',
                 'fontSize': '16px',
@@ -171,6 +171,60 @@ app.layout = html.Div([
                 ], style={'width': '50%'})
             ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
 
+            # Capital row
+            html.Div([
+                html.Div([
+                    html.H3('Capital', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='capital-value', children='Select a company', style={
+                        'fontSize': '16px',
+                        'textAlign': 'center',
+                        'padding': '12px',
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '8px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    })
+                ], style={'width': '70%', 'marginRight': '10px'}),
+                
+                html.Div([
+                    html.H3('vs. Previous Year', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='capital-change', children='', style={
+                        'fontSize': '16px',
+                        'textAlign': 'center',
+                        'padding': '12px',
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '8px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    })
+                ], style={'width': '30%'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
+
+            # Total Assets row
+            html.Div([
+                html.Div([
+                    html.H3('Total Assets', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='total-assets-value', children='Select a company', style={
+                        'fontSize': '16px',
+                        'textAlign': 'center',
+                        'padding': '12px',
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '8px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    })
+                ], style={'width': '70%', 'marginRight': '10px'}),
+                
+                html.Div([
+                    html.H3('vs. Previous Year', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='total-assets-change', children='', style={
+                        'fontSize': '16px',
+                        'textAlign': 'center',
+                        'padding': '12px',
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '8px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    })
+                ], style={'width': '30%'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
+
             # Current Ratio and Employee Count row
             html.Div([
                 html.Div([
@@ -196,7 +250,31 @@ app.layout = html.Div([
                         'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
                     })
                 ], style={'width': '50%'})
-            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
+
+            # Download button
+            html.Div([
+                dcc.Download(id="download-dataframe-xlsx"),
+                html.Button(
+                    "Download Financial Details",
+                    id='download-xlsx',
+                    style={
+                        'backgroundColor': '#007bff',
+                        'color': 'white',
+                        'border': 'none',
+                        'padding': '8px 15px',
+                        'borderRadius': '4px',
+                        'cursor': 'pointer',
+                        'fontSize': '12px',
+                        'fontFamily': 'Avenir, sans-serif'
+                    }
+                )
+            ], style={
+                'display': 'flex',
+                'justifyContent': 'flex-end',
+                'width': '100%',
+                'marginTop': '10px'
+            })
         ], style={
             'width': '50%',
             'padding': '20px',
@@ -277,7 +355,7 @@ def update_pl_value(selected_company):
         if pd.isna(pl_value):
             return 'Not Available'
         # Format the value in thousands with commas
-        formatted_pl = f"${int(pl_value):,}"
+        formatted_pl = f"€{int(pl_value):,}"
         return formatted_pl
     return ' '
 
@@ -448,7 +526,7 @@ def update_operating_revenue(selected_company):
         revenue = company_data['Operating revenue (Turnover)\nEUR Last avail. yr']
         if pd.isna(revenue):
             return 'Not Available'
-        return f"${int(revenue):,}"
+        return f"€{int(revenue):,}"
     return ''
 
 @app.callback(
@@ -461,7 +539,33 @@ def update_loans(selected_company):
         loans = company_data['Loans & short-term debt\nEUR Last avail. yr'] 
         if pd.isna(loans):
             return 'Not Available'
-        return f"${int(loans):,}"
+        return f"€{int(loans):,}"
+    return ''
+
+@app.callback(
+    Output('capital-value', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_capital_value(selected_company):
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        capital = company_data['Capital\nEUR Last avail. yr']
+        if pd.isna(capital):
+            return 'Not Available'
+        return f"€{int(capital):,}"
+    return ''
+
+@app.callback(
+    Output('total-assets-value', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_total_assets_value(selected_company):
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        total_assets = company_data['Total assets\nEUR Last avail. yr']
+        if pd.isna(total_assets):
+            return 'Not Available'
+        return f"€{int(total_assets):,}"
     return ''
 
 @app.callback(
@@ -489,6 +593,92 @@ def update_employee_count(selected_company):
             return 'Not Available'
         return f"{int(employees):,}"
     return ''
+
+@app.callback(
+    Output("download-dataframe-xlsx", "data"),
+    Input("download-xlsx", "n_clicks"),
+    Input("company-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def download_company_data(n_clicks, selected_company):
+    if n_clicks is None or not selected_company:
+        return None
+    
+    # Filter the companies DataFrame for the selected company
+    company_data = companies[companies['company_name'] == selected_company]
+    
+    # Return the data as an Excel file
+    return dcc.send_data_frame(
+        company_data.to_excel,
+        f"{selected_company}_financial_details.xlsx",
+        sheet_name="Financial Details"
+    )
+
+@app.callback(
+    [Output('capital-change', 'children'),
+     Output('capital-change', 'style')],
+    [Input('company-dropdown', 'value')]
+)
+def update_capital_change(selected_company):
+    base_style = {
+        'fontSize': '16px',
+        'textAlign': 'center',
+        'padding': '12px',
+        'backgroundColor': '#f8f9fa',
+        'borderRadius': '8px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+    }
+    
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        capital_change = company_data['Capital\nEUR Δ%']
+        
+        if pd.isna(capital_change):
+            return 'N/A', base_style
+            
+        # Determine color based on thresholds
+        if capital_change > 10:
+            base_style['color'] = '#008000'  # Green
+        elif capital_change < -10:
+            base_style['color'] = '#FF0000'  # Red
+        else:
+            base_style['color'] = '#FFA500'  # Yellow/Orange
+            
+        return f"{capital_change:+.1f}%", base_style
+    return ' ', base_style
+
+@app.callback(
+    [Output('total-assets-change', 'children'),
+     Output('total-assets-change', 'style')],
+    [Input('company-dropdown', 'value')]
+)
+def update_total_assets_change(selected_company):
+    base_style = {
+        'fontSize': '16px',
+        'textAlign': 'center',
+        'padding': '12px',
+        'backgroundColor': '#f8f9fa',
+        'borderRadius': '8px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+    }
+    
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        assets_change = company_data['Total assets\nEUR Δ%']
+        
+        if pd.isna(assets_change):
+            return 'N/A', base_style
+            
+        # Determine color based on thresholds
+        if assets_change > 10:
+            base_style['color'] = '#008000'  # Green
+        elif assets_change < -10:
+            base_style['color'] = '#FF0000'  # Red
+        else:
+            base_style['color'] = '#FFA500'  # Yellow/Orange
+            
+        return f"{assets_change:+.1f}%", base_style
+    return ' ', base_style
 
 # Run the app
 if __name__ == '__main__':
