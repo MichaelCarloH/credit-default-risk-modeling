@@ -45,7 +45,9 @@ Startups often suffer high default rates, and traditional credit scoring lacks t
 - **Displays:**  
   - Credit score = \((1 - P_0) \times 100\)  
   - Key Orbis financials  
-  - AI Assistant summary via LLM (ChatGPT 4.1 with browsing)  
+  - AI Assistant summary via LLM (ChatGPT 4.1 with web-search tool)  
+
+<img width="1401" alt="Screenshot 2025-05-12 at 15 59 25" src="https://github.com/user-attachments/assets/6e166a2d-c554-4395-996d-2fe0b07cd14a" />
 
 ---
 
