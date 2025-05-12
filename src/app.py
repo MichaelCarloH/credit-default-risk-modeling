@@ -36,7 +36,7 @@ app.layout = html.Div([
             html.Strong('A'),
             'ugmented ',
             html.Strong('D'),
-            'ata Dashboard, an AI-Powered Tool to Model Firms\' Credit Score from Publicly Available Data'
+            'ata Dashboard, with an AI-Powered Research Summaries and Credit Risk Scoring from Publicly Available Data'
         ],
             style={
                 'textAlign': 'center',
@@ -68,7 +68,7 @@ app.layout = html.Div([
                 placeholder="Company Name",
                 style={'width': '600px', 'marginBottom': '10px'}
             ),
-            html.Div(id='output-container', style={'maxWidth': '800px', 'fontSize': '12px'})
+            html.Div(id='output-container', style={'maxWidth': '800px', 'fontSize': '14px'})
         ], style={
             'display': 'flex', 
             'flexDirection': 'column',
@@ -83,7 +83,7 @@ app.layout = html.Div([
             html.Div([
                 html.H3('Credit Score', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
                 html.Div(id='credit-score', children='Select a company', style={
-                    'fontSize': '24px',
+                    'fontSize': '32px',
                     'textAlign': 'center',
                     'padding': '15px',
                     'backgroundColor': '#f8f9fa',
@@ -108,7 +108,7 @@ app.layout = html.Div([
             ], style={'width': '100%', 'marginBottom': '10px'}),
             
             # Financial Scorecard Header
-            html.H3('Topline Metrics (€ in thousands)', style={
+            html.H3('Topline Metrics', style={
                 'textAlign': 'center',
                 'marginTop': '30px',
                 'fontSize': '16px',
@@ -376,7 +376,7 @@ def update_pl_change(selected_company):
     
     if selected_company:
         company_data = companies[companies['company_name'] == selected_company].iloc[0]
-        pl_change = company_data['P/L for period [=Net income]\nEUR Δ%']
+        pl_change = company_data['P/L for period [=Net income]\nEUR Delta%']
         
         if pd.isna(pl_change):
             return 'N/A', base_style
@@ -404,7 +404,7 @@ def update_shapley_gauges(selected_company):
             gauges = []
             for _, row in company_features.iterrows():
                 feature = row['feature']
-                shap_value = row['shap_value']
+                shap_value = - row['shap_value']
                 
                 def format_title(title, max_line_length=25):  # Increased from 18
                     words = title.split()
@@ -491,7 +491,7 @@ def update_shapley_gauges(selected_company):
 )
 def update_credit_score(selected_company):
     base_style = {
-        'fontSize': '24px',
+        'fontSize': '32px',
         'textAlign': 'center',
         'padding': '15px',
         'backgroundColor': '#f8f9fa',
@@ -631,7 +631,7 @@ def update_capital_change(selected_company):
     
     if selected_company:
         company_data = companies[companies['company_name'] == selected_company].iloc[0]
-        capital_change = company_data['Capital\nEUR Δ%']
+        capital_change = company_data['Capital\nEUR Delta%']
         
         if pd.isna(capital_change):
             return 'N/A', base_style
@@ -664,7 +664,7 @@ def update_total_assets_change(selected_company):
     
     if selected_company:
         company_data = companies[companies['company_name'] == selected_company].iloc[0]
-        assets_change = company_data['Total assets\nEUR Δ%']
+        assets_change = company_data['Total assets\nEUR Delta%']
         
         if pd.isna(assets_change):
             return 'N/A', base_style
