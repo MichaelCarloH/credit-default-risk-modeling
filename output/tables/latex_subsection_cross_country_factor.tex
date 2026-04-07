@@ -1,0 +1,21 @@
+\subsection{A Cross-Country CDS-Adjusted Liquidity-Basis Factor}
+
+As a lightweight robustness exercise inspired by Monfort and Renne (2014), we construct a cross-country factor from CDS-adjusted sovereign yields without estimating a full affine regime-switching model. Let $y_{i,t}$ denote the sovereign bond yield for country $i$ and $CDS_{i,t}$ its matched-maturity CDS spread. We define
+\begin{equation}
+\tilde r_{i,t}=y_{i,t}-CDS_{i,t}.
+\end{equation}
+In a frictionless and fully integrated setting, CDS adjustment should remove most default compensation and leave a common curve across sovereigns. In practice, however, $\tilde r_{i,t}$ remains heterogeneous because it still embeds CDS--bond basis effects, market liquidity premia, convenience yields, counterparty-risk concerns, and segmentation in investor demand.
+
+Using Germany as benchmark, we define
+\begin{equation}
+basis_{i,t}=\tilde r_{i,t}-\tilde r_{DE,t},
+\end{equation}
+and aggregate across non-German issuers:
+\begin{equation}
+L_t=\sum_{i\neq DE} w_i\,basis_{i,t},
+\end{equation}
+with either equal or pre-specified weights. Economically, $L_t$ is not a pure liquidity measure; it is better interpreted as a liquidity-basis / fragmentation indicator that summarizes common deviations from integrated pricing.
+
+This construction complements, rather than replaces, the KfW--Bund logic. The KfW--Bund spread is a German-specific liquidity proxy under an explicit guarantee structure, while $L_t$ uses cross-country CDS-adjusted residuals and is therefore sensitive to euro-area fragmentation beyond Germany-specific market depth. We further propose cross-sectional dispersion metrics of $basis_{i,t}$ (standard deviation, median absolute deviation, range, interquartile range). These metrics capture whether fragmentation is broad-based or concentrated in a subset of issuers. In particular, dispersion can increase even when the average factor $L_t$ is stable, indicating heterogeneous stress transmission.
+
+Hence, the combined $(L_t,\mathrm{Dispersion}_t)$ system offers a tractable empirical extension for Master's-level research: it preserves the paper's core intuition that spreads are not pure default signals, while adding a transparent measure of cross-country fragmentation intensity. The main limitation is identification: residual wedges mix several non-default channels and should be interpreted as reduced-form evidence rather than a structural decomposition.
