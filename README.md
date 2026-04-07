@@ -1,89 +1,77 @@
-# Euro-Area Sovereign Spread Decomposition (Lightweight Pipeline)
+# Credit Risk Modeling for Startups (May 2025)
 
-This project implements a reproducible empirical pipeline inspired by Monfort and Renne (2014), focused on:
+## Objective  
+Improve credit risk predictions for funded startups using enriched external data and machine learning, with a focus on interpretability and practical deployment.
 
-- sovereign spread co-movement
-- CDS-adjusted residual basis vs Germany
-- an aggregate cross-country fragmentation factor (`L_t`)
-- dispersion metrics as an extension
-
-It is intentionally lightweight (Master's-report scope), not a full affine regime-switching replication.
-
-## Project Goal
-
-Approximate the paper's core stylized facts with robust public data and transparent substitutions:
-
-1. Download sovereign yields automatically where possible
-2. Build clean aligned panel data (`date,country,yield,cds`)
-3. Construct spread, CDS-adjusted basis, average factor, and dispersion metrics
-4. Run PCA/correlations/simple regressions
-5. Export publication-ready figures, tables, and a LaTeX subsection
-
-## Data Sources and Substitutions
-
-- **Sovereign yields**: downloaded from FRED/OECD long-term government yield series (10Y proxy).
-- **CDS spreads**: not auto-downloaded from a robust free bulk source in this pipeline.
-  - The code creates `data/raw/cds_template.csv` and expects manual input.
-  - No CDS data are fabricated.
-- **MacroMicro import path (recommended practical workaround)**:
-  - Download country CSVs from MacroMicro series pages and place them in `data/raw/macromicro/`.
-  - Include country names in filenames (e.g., `italy_5y_cds.csv`, `germany_5y_cds.csv`).
-  - The pipeline auto-builds `data/raw/cds_from_macromicro.csv` and uses it as CDS input.
-- **Academic-graph reconstruction path** (optional):
-  - The code creates `data/raw/cds_graph_anchor_points.csv`.
-  - You can digitize points from published figures (e.g., WebPlotDigitizer), paste anchors,
-    and the pipeline interpolates a monthly proxy to `data/raw/cds_from_paper_graphs_monthly.csv`.
-  - This is an approximation for robustness checks, not a substitute for original vendor CDS data.
-- **KfW-Bund spread**: optional template created at `data/raw/kfw_bund_template.csv`.
-
-See `data/raw/download_log.csv` after running for exact status per dataset/country.
-
-## Installation
-
-Using pip:
-
-```bash
-pip install -r requirements.txt
-```
-
-Or with your existing `pyproject.toml` workflow:
-
-```bash
-uv sync
-```
+## Project Summary  
+Startups often suffer high default rates, and traditional credit scoring lacks timely, rich financial data. Our solution integrates Orbis firm-level data and applies **XGBoost** to predict defaults, achieving an **AUC of 0.84**. We focus on identifying high-risk firms and explain predictions using **SHAP values**. The output feeds into an interactive dashboard that enables informed decisions by credit risk managers.
 
 ## Run
 
 ```bash
-python main.py
+python src/app.py
 ```
 
-If using MacroMicro CSVs, create this folder first and drop files in it:
+## Data Pipeline  
 
-```bash
-mkdir -p data/raw/macromicro
-```
+### Enrichment & Matching  
+- **Source:** Internal startup data + Orbis database (via Matching Research Tool)  
+- **Region:** EU firms only (focus + lower compute)  
+- **Match Rate:** ~60%  
+- **Final Dataset:** ~5,500 companies, 160+ features  
 
-Pipeline order:
-1. download / ingest
-2. optional graph-based CDS reconstruction
-3. clean data
-4. construct factors
-5. run analysis
-6. generate plots
-7. write LaTeX subsection
+### Preprocessing  
+- **Missing Values:** Median imputation  
+- **NACE Codes:** Normalized  
+- **Target Variable:** Binary (Active vs Inactive)  
+- **Feature Engineering:** Financial ratios, interactions, encodings  
 
-## Folder Structure
+---
 
-- `data/raw/`: downloaded files and templates
-- `data/processed/`: cleaned panel and factor outputs
-- `output/figures/`: charts
-- `output/tables/`: summary tables, regression results, LaTeX subsection
-- `src/`: modular pipeline code
+## Modeling  
 
-## Economic Interpretation and Cautions
+### Algorithm  
+- **Model:** XGBoost  
+- **Loss Function:** Cost-sensitive (penalizes missed defaults)  
+- **Interpretability:** SHAP (local + global feature explanations)
 
-- `r_tilde = yield - cds` is **not** a pure risk-free rate.
-- `basis = r_tilde_i - r_tilde_DE` mixes liquidity-basis, segmentation, and other residual premia.
-- `L_t` is a **liquidity-basis / fragmentation factor**, not pure liquidity.
-- Dispersion metrics are exploratory reduced-form diagnostics, not structural identification.
+### Metrics  
+- **ROC AUC:** 0.845  
+- **Precision:** 0.818  
+- **MAE:** 0.298  
+- **TSS (Optimal threshold = 0.3601):** 0.5445  
+- **Calibration:** Strong alignment between predicted and observed default rates  
+
+---
+
+## Dashboard: RAAD (Risk Assessment from Augmented Data)  
+
+- **Displays:**  
+  - Credit score = \((1 - P_0) \times 100\)  
+  - Key Orbis financials  
+  - AI Assistant summary via LLM (ChatGPT 4.1 with web-search tool)  
+
+<img width="1401" alt="Screenshot 2025-05-12 at 15 59 25" src="https://github.com/user-attachments/assets/6e166a2d-c554-4395-996d-2fe0b07cd14a" />
+
+---
+
+## Future Development  
+
+### Next Steps  
+- CI/CD pipeline for retraining and updates  
+- Integrate internal data (ERP, payment logs)  
+- Deploy RAAD Dashboard on **AWS/Azure**  
+- Extend to global firms and adapt to local accounting standards  
+
+---
+
+## Tech Stack  
+- **Modeling:** Python, XGBoost, SHAP  
+- **Data:** Orbis, internal credit data  
+- **Frontend:** Streamlit / Dash (for dashboard)  
+- **LLM Assistant:** OpenAI ChatGPT 4.1 (w/ web search)  
+- **Deployment:** Docker, Azure (planned)
+
+---
+
+🚀 **Proof of Concept complete - contributions, ideas, and extensions welcome!**

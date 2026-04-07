@@ -2,37 +2,73 @@ import pandas as pd
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
+import plotly.graph_objects as go
 import llm_research as llm
-import json
-from sector_dashboard import load_sector_data, create_sector_layout
-import plotly.express as px
 
 # Load the companies' data
-companies = pd.read_excel("data/output.xlsx")
-companies = companies[companies['Standardized country'] != 'Russia']
-companies.rename(columns={'Standardized country': 'country', 'Company name Latin alphabet': 'company'}, inplace=True)
-companies['company'] = companies['company'].str.title() # Convert company names and country to proper case
-companies['country'] = companies['country'].str.title()
-
-# Load sector data
-sector_data = load_sector_data()
+companies = pd.read_csv('./data/output_with_predictions.tsv', sep='\t')
+shapley = pd.read_csv('./data/shapley_features.tsv', sep='\t')
+# Remove rows with rank 5 from the shapley DataFrame
+shapley = shapley[shapley['rank'] != 5]
 
 # Initialize the Dash app
 app = dash.Dash(__name__)
 
 # Layout of the app
 app.layout = html.Div([
+    # Title Card
+    html.Div([
+        html.H1('RAAD Dashboard', 
+            style={
+                'textAlign': 'center',
+                'fontFamily': 'Avenir, sans-serif',
+                'fontSize': '24pt',
+                'marginBottom': '5px',
+                'fontWeight': 'bold'
+            }
+        ),
+        html.H2([
+            'Welcome to the ',
+            html.Strong('R'),
+            'isk ',
+            html.Strong('A'),
+            'ssessment from ',
+            html.Strong('A'),
+            'ugmented ',
+            html.Strong('D'),
+            'ata Dashboard, with an AI-Powered Research Summaries and Credit Risk Scoring from Publicly Available Data'
+        ],
+            style={
+                'textAlign': 'center',
+                'fontFamily': 'Avenir, sans-serif',
+                'fontSize': '14pt',
+                'fontWeight': 'normal',
+                'color': '#666666',
+                'marginTop': '0',
+                'marginBottom': '30px'
+            }
+        )
+    ], style={
+        'width': '100%',
+        'backgroundColor': '#f8f9fa',
+        'padding': '20px 0',
+        'marginBottom': '20px'
+    }),
+
+    # Main content wrapper
     html.Div([
         # Left side content
         html.Div([
             dcc.Dropdown(
                 id='company-dropdown',
-                options=[{'label': company, 'value': company} for company in companies['company']],
+                options=[
+                    {'label': company_name, 'value': company_name} 
+                    for company_name in sorted(companies['company_name'])
+                ],
                 placeholder="Company Name",
                 style={'width': '600px', 'marginBottom': '10px'}
             ),
-            html.Div(id='output-container', style={'maxWidth': '800px', 'fontSize': '12px'}),
-            dcc.Graph(id='sector-bar-chart')
+            html.Div(id='output-container', style={'maxWidth': '800px', 'fontSize': '14px'})
         ], style={
             'display': 'flex', 
             'flexDirection': 'column',
@@ -45,8 +81,8 @@ app.layout = html.Div([
         html.Div([
             # Big scorecard
             html.Div([
-                html.H3('Credit Risk Score', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
-                html.Div('85', style={
+                html.H3('Credit Score', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                html.Div(id='credit-score', children='Select a company', style={
                     'fontSize': '32px',
                     'textAlign': 'center',
                     'padding': '15px',
@@ -56,6 +92,30 @@ app.layout = html.Div([
                     'marginBottom': '20px'
                 })
             ], style={'width': '100%', 'marginBottom': '20px'}),
+            
+            # Shapley Values Gauges
+            html.Div([
+                html.H3('Top Metrics Flagged by Risk Model', style={'textAlign': 'center', 'marginBottom': '5px', 'fontSize': '16px'}),
+                html.Div(id='shapley-gauges', style={
+                    'display': 'flex', 
+                    'flexDirection': 'row', 
+                    'flexWrap': 'wrap',
+                    'gap': '8px',
+                    'justifyContent': 'center',
+                    'alignItems': 'center',
+                    'marginBottom': '0px'
+                })
+            ], style={'width': '100%', 'marginBottom': '10px'}),
+            
+            # Financial Scorecard Header
+            html.H3('Topline Metrics', style={
+                'textAlign': 'center',
+                'marginTop': '30px',
+                'fontSize': '16px',
+                'borderTop': '1px solid #ddd',
+                'paddingTop': '10px',
+                'paddingBottom': '5px'
+            }),
             
             # P/L row
             html.Div([
@@ -69,7 +129,7 @@ app.layout = html.Div([
                         'borderRadius': '8px',
                         'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
                     })
-                ], style={'width': '80%', 'marginRight': '10px'}),
+                ], style={'width': '70%', 'marginRight': '10px'}),
                 
                 html.Div([
                     html.H3('vs. Previous Year', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
@@ -81,41 +141,14 @@ app.layout = html.Div([
                         'borderRadius': '8px',
                         'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
                     })
-                ], style={'width': '20%'})
-            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '20px'}),
-            
-            # Assets row
+                ], style={'width': '30%'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
+
+            # Operating Revenue and Loans row
             html.Div([
                 html.Div([
-                    html.H3('Assets', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
-                    html.Div('$125M', style={
-                        'fontSize': '16px',
-                        'textAlign': 'center',
-                        'padding': '12px',
-                        'backgroundColor': '#f8f9fa',
-                        'borderRadius': '8px',
-                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-                    })
-                ], style={'width': '80%', 'marginRight': '10px'}),
-                
-                html.Div([
-                    html.H3('vs. Previous Year', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
-                    html.Div('+8%', style={
-                        'fontSize': '16px',
-                        'textAlign': 'center',
-                        'padding': '12px',
-                        'backgroundColor': '#f8f9fa',
-                        'borderRadius': '8px',
-                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-                    })
-                ], style={'width': '20%'})
-            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '20px'}),
-            
-            # Capital/Debt row 1
-            html.Div([
-                html.Div([
-                    html.H3('Capital', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
-                    html.Div('$45M', style={
+                    html.H3('Operating Revenue', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='operating-revenue', children='Select a company', style={
                         'fontSize': '16px',
                         'textAlign': 'center',
                         'padding': '12px',
@@ -126,8 +159,8 @@ app.layout = html.Div([
                 ], style={'width': '50%', 'marginRight': '10px'}),
                 
                 html.Div([
-                    html.H3('Debt', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
-                    html.Div('$30M', style={
+                    html.H3('Loans & Short Term Debt', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='loans', children='Select a company', style={
                         'fontSize': '16px',
                         'textAlign': 'center',
                         'padding': '12px',
@@ -136,14 +169,13 @@ app.layout = html.Div([
                         'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
                     })
                 ], style={'width': '50%'})
-            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '20px'}),
-            
-            
-            # Employees row
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
+
+            # Capital row
             html.Div([
                 html.Div([
-                    html.H3('Employees', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
-                    html.Div('1,250', style={
+                    html.H3('Capital', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='capital-value', children='Select a company', style={
                         'fontSize': '16px',
                         'textAlign': 'center',
                         'padding': '12px',
@@ -151,11 +183,11 @@ app.layout = html.Div([
                         'borderRadius': '8px',
                         'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
                     })
-                ], style={'width': '80%', 'marginRight': '10px'}),
+                ], style={'width': '70%', 'marginRight': '10px'}),
                 
                 html.Div([
                     html.H3('vs. Previous Year', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
-                    html.Div('+5%', style={
+                    html.Div(id='capital-change', children='', style={
                         'fontSize': '16px',
                         'textAlign': 'center',
                         'padding': '12px',
@@ -163,8 +195,86 @@ app.layout = html.Div([
                         'borderRadius': '8px',
                         'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
                     })
-                ], style={'width': '20%'})
-            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%'})
+                ], style={'width': '30%'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
+
+            # Total Assets row
+            html.Div([
+                html.Div([
+                    html.H3('Total Assets', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='total-assets-value', children='Select a company', style={
+                        'fontSize': '16px',
+                        'textAlign': 'center',
+                        'padding': '12px',
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '8px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    })
+                ], style={'width': '70%', 'marginRight': '10px'}),
+                
+                html.Div([
+                    html.H3('vs. Previous Year', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='total-assets-change', children='', style={
+                        'fontSize': '16px',
+                        'textAlign': 'center',
+                        'padding': '12px',
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '8px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    })
+                ], style={'width': '30%'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
+
+            # Current Ratio and Employee Count row
+            html.Div([
+                html.Div([
+                    html.H3('Current Ratio', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='current-ratio', children='Select a company', style={
+                        'fontSize': '16px',
+                        'textAlign': 'center',
+                        'padding': '12px',
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '8px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    })
+                ], style={'width': '50%', 'marginRight': '10px'}),
+                
+                html.Div([
+                    html.H3('Employee Count', style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': '16px'}),
+                    html.Div(id='employee-count', children='Select a company', style={
+                        'fontSize': '16px',
+                        'textAlign': 'center',
+                        'padding': '12px',
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '8px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    })
+                ], style={'width': '50%'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '100%', 'marginBottom': '10px'}),
+
+            # Download button
+            html.Div([
+                dcc.Download(id="download-dataframe-xlsx"),
+                html.Button(
+                    "Download Financial Details",
+                    id='download-xlsx',
+                    style={
+                        'backgroundColor': '#007bff',
+                        'color': 'white',
+                        'border': 'none',
+                        'padding': '8px 15px',
+                        'borderRadius': '4px',
+                        'cursor': 'pointer',
+                        'fontSize': '12px',
+                        'fontFamily': 'Avenir, sans-serif'
+                    }
+                )
+            ], style={
+                'display': 'flex',
+                'justifyContent': 'flex-end',
+                'width': '100%',
+                'marginTop': '10px'
+            })
         ], style={
             'width': '50%',
             'padding': '20px',
@@ -177,65 +287,61 @@ app.layout = html.Div([
         'maxWidth': '2000px',
         'margin': '0 auto',
         'fontFamily': 'Avenir, sans-serif'
+    }),
+
+    # Combined disclaimers at the bottom
+    html.Div([
+        html.Div([
+            html.P([
+                "Disclaimers: ",
+                html.Br(),
+                "1. This application uses an AI research assistant to gather publicly available company information from the web. The data may be incomplete, outdated, or inaccurate and is provided for general informational purposes only. Users should verify details independently and consult primary sources before making any decisions.",
+                html.Br(),
+                "2. The credit risk score and associated financial metrics presented herein are derived solely from data available through Moody's Orbis, a third-party financial information platform covering public and private companies. The model relies exclusively on the most recent available annual financial data reported within Orbis, which may be incomplete, outdated, or contain inaccuracies. As such, the credit risk assessment should not be interpreted as definitive. For a more comprehensive and current evaluation of a company's creditworthiness, users are encouraged to obtain detailed, up-to-date financial information directly from the company in question."
+            ], style={
+                'fontStyle': 'italic',
+                'fontSize': '9px',
+                'color': '#666666',
+                'textAlign': 'justify',
+                'margin': '0 auto',
+                'maxWidth': '1800px',
+                'padding': '0 20px',
+                'fontFamily': 'Avenir, sans-serif'
+            })
+        ])
+    ], style={
+        'width': '100%',
+        'backgroundColor': '#f8f9fa',
+        'padding': '15px 0',
+        'marginTop': '20px'
     })
 ])
 
-# Callback to update both the sector bar chart and the output container
+# Callback to update the research output container
 @app.callback(
-    [Output('sector-bar-chart', 'figure'),
-     Output('output-container', 'children')],
+    Output('output-container', 'children'),
     [Input('company-dropdown', 'value')]
 )
 def update_dashboard(selected_company):
     if selected_company:
-        company_data = companies[companies['company'] == selected_company].iloc[0]
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
         country = company_data['country']
         research_data = llm.generate_research(selected_company, country)
-        formatted_output = html.Div([
-            html.H3("Company Description"),
-            dcc.Markdown(research_data.get("Company Description", "N/A")),
-            html.H3("Public Financial Description"),
-            dcc.Markdown(research_data.get("Public Financial Description", "N/A")),
-            html.H3("Potential Benefits"),
-            dcc.Markdown(research_data.get("Potential Benefits", "N/A")),
-            html.H3("Potential Risks"),
-            dcc.Markdown(research_data.get("Potential Risks", "N/A"))
+        return html.Div([
+            html.Div([
+                html.H3("Company Description"),
+                html.P(dcc.Markdown(research_data.get("Company Description", "I'm sorry. There is no sufficient publicly-available data in the web for this company."))),
+                html.H3("Public Financial Description"),
+                html.P(dcc.Markdown(research_data.get("Public Financial Description", "I'm sorry. There is no sufficient publicly-available data in the web for this company."))),
+                html.H3("Potential Benefits"),
+                html.P(dcc.Markdown(research_data.get("Potential Benefits", "I'm sorry. There is no sufficient publicly-available data in the web for this company."))),
+                html.H3("Potential Risks"),
+                html.P(dcc.Markdown(research_data.get("Potential Risks", "I'm sorry. There is no sufficient publicly-available data in the web for this company.")))
+            ])
         ])
-        company_sector_data = sector_data[sector_data['Company name Latin alphabet'] == selected_company]
-        if company_sector_data.empty:
-            bar_chart = px.bar(
-                x=['Metric'],
-                y=[0],
-                labels={'x': 'Metric', 'y': 'Value'},
-                title=f"No Data for {selected_company}"
-            )
-        else:
-            metrics = [
-                'Operating revenue (Turnover)\nEUR Last avail. yr',
-                'P/L before tax\nEUR Last avail. yr',
-                'Number of employees\nLast avail. yr'
-            ]
-            company_values = company_sector_data[metrics].iloc[0]
-            bar_chart = px.bar(
-                x=metrics,
-                y=company_values.values,
-                labels={'x': 'Metric', 'y': 'Value'},
-                title=f"Sector Data for {selected_company}"
-            )
-
-        return bar_chart, formatted_output
-
-    return (
-        px.bar(
-            x=['Metric'],
-            y=[0],
-            labels={'x': 'Metric', 'y': 'Value'},
-            title="No Company Selected"
-        ),
-        html.P(
-            "Generate a research report by selecting a company from the dropdown.",
-            style={'color': '#666666', 'fontStyle': 'italic'}
-        )
+    return html.P(
+        "Generate a research report by selecting a company from the dropdown. Powered by AI.",
+        style={'color': '#666666', 'fontStyle': 'italic'}
     )
 
 @app.callback(
@@ -244,12 +350,12 @@ def update_dashboard(selected_company):
 )
 def update_pl_value(selected_company):
     if selected_company:
-        company_data = companies[companies['company'] == selected_company].iloc[0]
-        pl_value = company_data['P/L before tax\nEUR Last avail. yr']
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        pl_value = company_data['P/L before tax\nEUR Last avail. yr'] 
         if pd.isna(pl_value):
             return 'Not Available'
         # Format the value in thousands with commas
-        formatted_pl = f"${int(pl_value):,}"
+        formatted_pl = f"€{int(pl_value):,}"
         return formatted_pl
     return ' '
 
@@ -269,8 +375,8 @@ def update_pl_change(selected_company):
     }
     
     if selected_company:
-        company_data = companies[companies['company'] == selected_company].iloc[0]
-        pl_change = company_data['P/L for period [=Net income]\nEUR Δ%']
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        pl_change = company_data['P/L for period [=Net income]\nEUR Delta%']
         
         if pd.isna(pl_change):
             return 'N/A', base_style
@@ -286,8 +392,293 @@ def update_pl_change(selected_company):
         return f"{pl_change:+.1f}%", base_style
     return ' ', base_style
 
-# Create the sector dashboard layout
-create_sector_layout(app, sector_data)
+# Callback to update the Shapley gauges
+@app.callback(
+    Output('shapley-gauges', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_shapley_gauges(selected_company):
+    if selected_company:
+        company_features = shapley[shapley['company_name'] == selected_company]
+        if not company_features.empty:
+            gauges = []
+            for _, row in company_features.iterrows():
+                feature = row['feature']
+                shap_value = - row['shap_value']
+                
+                def format_title(title, max_line_length=25):  # Increased from 18
+                    words = title.split()
+                    lines = []
+                    current_line = []
+                    current_length = 0
+                    
+                    for word in words:
+                        if current_length + len(word) + 1 <= max_line_length:
+                            current_line.append(word)
+                            current_length += len(word) + 1
+                        else:
+                            if current_line:
+                                lines.append(' '.join(current_line))
+                            current_line = [word]
+                            current_length = len(word)
+                    
+                    if current_line:
+                        lines.append(' '.join(current_line))
+                    
+                    return '<br>'.join(lines)
+
+                def get_color(value):
+                    if value > 0:
+                        return 'rgba(109, 191, 92, 1.0)' 
+                    else:
+                        return 'rgba(214, 88, 86, 0.5)'
+                
+                fig = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=shap_value,
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={
+                        'text': format_title(feature),
+                        'font': {'size': 8},
+                        'align': 'center'
+                    },
+                    number={'font': {'size': 8}},  # Reduced from 10
+                    gauge={
+                        'axis': {
+                            'range': [-3.5, 3.5],
+                            'tickfont': {'size': 6}  # Reduced from 8
+                        },
+                        'bar': {'color': get_color(shap_value)},
+                        'steps': [
+                            {'range': [-3.5, 0], 'color': 'rgba(214, 88, 86, 0.5)'},  # Adjusted background opacity
+                            {'range': [0, 3.5], 'color': 'rgba(109, 191, 92, 0.5)'}
+                        ],
+                    }
+                ))
+                
+                fig.update_layout(
+                    margin=dict(l=5, r=5, t=20, b=10),  # Reduced bottom margin from 15
+                    height=150,  # Reduced from 160
+                    width=120,
+                    paper_bgcolor='white',
+                    plot_bgcolor='white'
+                )
+                
+                gauges.append(html.Div([
+                    dcc.Graph(
+                        figure=fig,
+                        style={
+                            'height': '120px',  # Reduced from 160px
+                            'width': '150px',
+                            'margin': 'auto'
+                        },
+                        config={'displayModeBar': False}
+                    )
+                ], style={
+                    'flex': '0 0 auto',
+                    'minWidth': '120px',
+                    'display': 'flex',
+                    'justifyContent': 'center',
+                    'alignItems': 'center'
+                }))
+            return gauges
+    return []
+
+@app.callback(
+    [Output('credit-score', 'children'),
+     Output('credit-score', 'style')],
+    [Input('company-dropdown', 'value')]
+)
+def update_credit_score(selected_company):
+    base_style = {
+        'fontSize': '32px',
+        'textAlign': 'center',
+        'padding': '15px',
+        'backgroundColor': '#f8f9fa',
+        'borderRadius': '8px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+        'marginBottom': '20px'
+    }
+    
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        score = (1 - company_data['predicted_proba']) * 100
+        
+        # Add color coding based on the score
+        if score >= 80:
+            base_style['color'] = '#008000'  # Green for good scores
+        elif score >= 60:
+            base_style['color'] = '#FFA500'  # Orange for medium scores
+        else:
+            base_style['color'] = '#FF0000'  # Red for low scores
+            
+        return f"{score:.1f}", base_style
+    return 'Select a company', base_style
+
+# Add these callbacks before the "if __name__ == '__main__':" line
+@app.callback(
+    Output('operating-revenue', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_operating_revenue(selected_company):
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        revenue = company_data['Operating revenue (Turnover)\nEUR Last avail. yr']
+        if pd.isna(revenue):
+            return 'Not Available'
+        return f"€{int(revenue):,}"
+    return ''
+
+@app.callback(
+    Output('loans', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_loans(selected_company):
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        loans = company_data['Loans & short-term debt\nEUR Last avail. yr'] 
+        if pd.isna(loans):
+            return 'Not Available'
+        return f"€{int(loans):,}"
+    return ''
+
+@app.callback(
+    Output('capital-value', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_capital_value(selected_company):
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        capital = company_data['Capital\nEUR Last avail. yr']
+        if pd.isna(capital):
+            return 'Not Available'
+        return f"€{int(capital):,}"
+    return ''
+
+@app.callback(
+    Output('total-assets-value', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_total_assets_value(selected_company):
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        total_assets = company_data['Total assets\nEUR Last avail. yr']
+        if pd.isna(total_assets):
+            return 'Not Available'
+        return f"€{int(total_assets):,}"
+    return ''
+
+@app.callback(
+    Output('current-ratio', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_current_ratio(selected_company):
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        ratio = company_data['Current ratio\nLast avail. yr']
+        if pd.isna(ratio):
+            return 'Not Available'
+        return f"{ratio:.2f}"
+    return ''
+
+@app.callback(
+    Output('employee-count', 'children'),
+    [Input('company-dropdown', 'value')]
+)
+def update_employee_count(selected_company):
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        employees = company_data['Number of employees\nLast avail. yr']
+        if pd.isna(employees):
+            return 'Not Available'
+        return f"{int(employees):,}"
+    return ''
+
+@app.callback(
+    Output("download-dataframe-xlsx", "data"),
+    Input("download-xlsx", "n_clicks"),
+    Input("company-dropdown", "value"),
+    prevent_initial_call=True,
+)
+def download_company_data(n_clicks, selected_company):
+    if n_clicks is None or not selected_company:
+        return None
+    
+    # Filter the companies DataFrame for the selected company
+    company_data = companies[companies['company_name'] == selected_company]
+    
+    # Return the data as an Excel file
+    return dcc.send_data_frame(
+        company_data.to_excel,
+        f"{selected_company}_financial_details.xlsx",
+        sheet_name="Financial Details"
+    )
+
+@app.callback(
+    [Output('capital-change', 'children'),
+     Output('capital-change', 'style')],
+    [Input('company-dropdown', 'value')]
+)
+def update_capital_change(selected_company):
+    base_style = {
+        'fontSize': '16px',
+        'textAlign': 'center',
+        'padding': '12px',
+        'backgroundColor': '#f8f9fa',
+        'borderRadius': '8px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+    }
+    
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        capital_change = company_data['Capital\nEUR Delta%']
+        
+        if pd.isna(capital_change):
+            return 'N/A', base_style
+            
+        # Determine color based on thresholds
+        if capital_change > 10:
+            base_style['color'] = '#008000'  # Green
+        elif capital_change < -10:
+            base_style['color'] = '#FF0000'  # Red
+        else:
+            base_style['color'] = '#FFA500'  # Yellow/Orange
+            
+        return f"{capital_change:+.1f}%", base_style
+    return ' ', base_style
+
+@app.callback(
+    [Output('total-assets-change', 'children'),
+     Output('total-assets-change', 'style')],
+    [Input('company-dropdown', 'value')]
+)
+def update_total_assets_change(selected_company):
+    base_style = {
+        'fontSize': '16px',
+        'textAlign': 'center',
+        'padding': '12px',
+        'backgroundColor': '#f8f9fa',
+        'borderRadius': '8px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+    }
+    
+    if selected_company:
+        company_data = companies[companies['company_name'] == selected_company].iloc[0]
+        assets_change = company_data['Total assets\nEUR Delta%']
+        
+        if pd.isna(assets_change):
+            return 'N/A', base_style
+            
+        # Determine color based on thresholds
+        if assets_change > 10:
+            base_style['color'] = '#008000'  # Green
+        elif assets_change < -10:
+            base_style['color'] = '#FF0000'  # Red
+        else:
+            base_style['color'] = '#FFA500'  # Yellow/Orange
+            
+        return f"{assets_change:+.1f}%", base_style
+    return ' ', base_style
 
 # Run the app
 if __name__ == '__main__':
